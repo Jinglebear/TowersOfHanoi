@@ -30,6 +30,7 @@ public class TowersOfHanoi extends Application {
     Button btnSolve = new Button("solve");
     Button btnSolveByStep = new Button("solve by step");
     Button btnGenerate = new Button("generate Blocks");
+    Button btnStart = new Button("Start:1");
     Button btnTarget = new Button("Target:2");
     Button btnFirsttoSecond = new Button("1 --> 2");
     Button btnFirsttoThird = new Button("1 --> 3");
@@ -49,7 +50,11 @@ public class TowersOfHanoi extends Application {
     
     @Override
     public void start(Stage s) throws Exception {
+    	//Initiate roles for stacks
+    	start = 0;
     	target = 1;
+    	aux = 2;
+    	
     	moves = new ArrayList<Move>();
     	solution = new ArrayList<Move>();
     	bars.add(rbarA);
@@ -58,7 +63,6 @@ public class TowersOfHanoi extends Application {
         stacks.add(stack1);
         stacks.add(stack2);
         stacks.add(stack3);
-        
         
         makeGUI(s);
         
@@ -82,7 +86,7 @@ public class TowersOfHanoi extends Application {
            // r.heightProperty().bind(s.heightProperty().divide(n+2));	//line to allow height to be relative to screen height
             deltaWidth += 25;
             startYRect -=startHeight;
-            r.xProperty().bind(rbarA.xProperty().subtract(r.widthProperty().divide(2).subtract(0.5*rbarA.getWidth())));
+            r.xProperty().bind(bars.get(start).xProperty().subtract(r.widthProperty().divide(2).subtract(0.5*rbarA.getWidth())));
             r.yProperty().bind(rbase.yProperty().subtract((rectangles.size())*r.getHeight()+r.getHeight()));
             rectangles.add(r);             
         }
@@ -95,14 +99,17 @@ public class TowersOfHanoi extends Application {
         //Update Stack-Data (adding all Rectangles to first Stack:
         for(int i = 0; i < rectangles.size(); ++i)
         {
-        	stack1.add(i);
+        	stacks.get(start).add(i);
         }
         
         //Prepare solution based on current (final) target-Stack:
+        /*
         if(target == 1)
         	solve(rectangles.size(), 0, 1, 2, solution);
         else if(target == 2)
         	solve(rectangles.size(), 0, 2, 1, solution);
+        */
+        solve(rectangles.size(), start, target, aux, solution);
         
         for(int i = 0; i < solution.size(); ++i)
         {
@@ -111,6 +118,16 @@ public class TowersOfHanoi extends Application {
         
         //Deactivate Generation Button:
         btnGenerate.setDisable(true);
+        //Deactivate the Start and Target choice buttons:
+        btnStart.setDisable(true);
+        btnTarget.setDisable(true);
+        
+        //set Minimal Window width and height:
+        if(n > 2)
+        {
+        	s.setMinWidth(n*100);
+        	s.setMinHeight(n*50);
+        }
         
     }
     private void makeGUI(Stage s){
@@ -120,6 +137,7 @@ public class TowersOfHanoi extends Application {
         vb.getChildren().add(btnGenerate);
         vb.getChildren().add(btnSolve);
         vb.getChildren().add(btnSolveByStep);
+        vb.getChildren().add(btnStart);
         vb.getChildren().add(btnTarget);
         vb.getChildren().add(btnFirsttoSecond);        
         vb.getChildren().add(btnFirsttoThird);
@@ -138,12 +156,91 @@ public class TowersOfHanoi extends Application {
         btnGenerate.setOnAction(e->generateRectangles(s));
         btnSolve.setOnAction(e->autoSolve());
         btnSolveByStep.setOnAction(e -> solveByStep());
-        btnTarget.setOnAction(e -> {					//!only effective if used before start of game (Generation of rectangles)
-        	if(btnTarget.getText().equals("Target:2"))
+        btnStart.setOnAction(e -> {
+        	if(btnStart.getText().equals("Start:1"))
         	{
-        		btnTarget.setText("Target:3");
-        		target = 2;		//Stack with index 2 is target
+        		if(!btnTarget.getText().equals("Target:2"))
+        		{
+        			btnStart.setText("Start:2");
+        			start = 1;
+        		}
+        		else
+        		{
+        			btnStart.setText("Start:3");
+        			start = 2;
+        		}
+        			
         	}
+        	else if(btnStart.getText().equals("Start:2"))
+        	{
+        		if(!btnTarget.getText().equals("Target:3"))
+        		{
+	        		btnStart.setText("Start:3");
+	        		start = 2;		
+        		}
+        		else
+        		{
+        			btnStart.setText("Start:1");
+        			start = 0;
+        		}
+        	}
+        	else if(btnStart.getText().equals("Start:3"))
+        	{
+        		if(!btnTarget.getText().equals("Target:1"))
+        		{
+        			btnStart.setText("Start:1");
+        			start = 0;
+        		}
+        		else
+        		{
+        			btnStart.setText("Start:2");
+        			start= 1;
+        		}
+        	}
+        	setAux();
+        });
+        btnTarget.setOnAction(e -> {					//!only effective if used before start of game (Generation of rectangles)
+        	if(btnTarget.getText().equals("Target:1"))
+        	{
+        		if(!btnStart.getText().equals("Start:2"))
+        		{
+        			btnTarget.setText("Target:2");
+        			target = 1;
+        		}
+        		else
+        		{
+        			btnTarget.setText("Target:3");
+        			target = 2;
+        		}
+        			
+        	}
+        	else if(btnTarget.getText().equals("Target:2"))
+        	{
+        		if(!btnStart.getText().equals("Start:3"))
+        		{
+	        		btnTarget.setText("Target:3");
+	        		target = 2;		
+        		}
+        		else
+        		{
+        			btnTarget.setText("Target:1");
+        			target = 0;
+        		}
+        	}
+        	else if(btnTarget.getText().equals("Target:3"))
+        	{
+        		if(!btnStart.getText().equals("Start:1"))
+        		{
+        			btnTarget.setText("Target:1");
+        			target = 0;
+        		}
+        		else
+        		{
+        			btnTarget.setText("Target:2");
+        			target = 1;
+        		}
+        	}
+        	setAux();
         });
         rbase.widthProperty().bind(s.widthProperty());
         rbase.yProperty().bind(s.heightProperty().subtract(rbase.getHeight()));
@@ -174,12 +271,19 @@ public class TowersOfHanoi extends Application {
     private Pane p;
     private Scene sc;
     
+    private void setAux()
+    {
+    	if(start+target == 1) {aux = 2;}
+    	else if(start+target == 2) {aux = 1;}
+    	else if(start+target == 3) {aux = 0;}
+    }
+    
     //Automatically rewind to last appropriate state and solve problem
     private void autoSolve()
     {
     	
     	solveByStep();	//do one step of the solution; then wait 0.5 seconds using a Task (Thread.sleep() didn't work)
-    	if(!moves.get(moves.size()-1).correct || moves.size() < solution.size())
+    	if(moves.size() == 0 || !moves.get(moves.size()-1).correct || moves.size() < solution.size())	//
     	{
     		//Task to perform steps periodically
     		Task<Void> sleeper = new Task<Void>() {
@@ -342,8 +446,12 @@ public class TowersOfHanoi extends Application {
     
     ArrayList<Move> moves;
     ArrayList<Move> solution;
-    int target;
+    //int target;
     Color lastColor;
+    
+    int start;		//stack to put all discs at the beginning
+    int target;		//stack to get all discs to to win
+    int aux;		//stack to use during the process
 
     // random color generating method
     private Color rndmColor(){
