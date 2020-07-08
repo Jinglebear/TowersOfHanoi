@@ -58,6 +58,8 @@ public class TowersOfHanoi extends Application {
         stacks.add(stack1);
         stacks.add(stack2);
         stacks.add(stack3);
+        
+        
         makeGUI(s);
         
     }
@@ -88,7 +90,6 @@ public class TowersOfHanoi extends Application {
         for(Rectangle r : rectangles){
     
             p.getChildren().add(r);
-
         }
         
         //Update Stack-Data (adding all Rectangles to first Stack:
@@ -108,6 +109,8 @@ public class TowersOfHanoi extends Application {
         	System.out.println("Move Disc from " + solution.get(i).from + " to " + solution.get(i).to + ".");
         }
         
+        //Deactivate Generation Button:
+        btnGenerate.setDisable(true);
         
     }
     private void makeGUI(Stage s){
@@ -146,15 +149,15 @@ public class TowersOfHanoi extends Application {
         rbase.yProperty().bind(s.heightProperty().subtract(rbase.getHeight()));
 
         rbarA.heightProperty().bind(s.heightProperty().divide(5).multiply(4));
-        rbarA.yProperty().bind(s.heightProperty().divide(20).multiply(2));
+        rbarA.yProperty().bind(rbase.yProperty().subtract(rbarA.heightProperty()));
         rbarA.xProperty().bind(s.widthProperty().divide(2).divide(2));
 
         rbarB.heightProperty().bind(s.heightProperty().divide(5).multiply(4));
-        rbarB.yProperty().bind(s.heightProperty().divide(20).multiply(2));
+        rbarB.yProperty().bind(rbase.yProperty().subtract(rbarB.heightProperty()));
         rbarB.xProperty().bind(s.widthProperty().divide(2));
 
         rbarC.heightProperty().bind(s.heightProperty().divide(5).multiply(4));
-        rbarC.yProperty().bind(s.heightProperty().divide(20).multiply(2));
+        rbarC.yProperty().bind(rbase.yProperty().subtract(rbarC.heightProperty()));
         rbarC.xProperty().bind(s.widthProperty().subtract(rbarA.xProperty()));
 
         
@@ -174,33 +177,6 @@ public class TowersOfHanoi extends Application {
     //Automatically rewind to last appropriate state and solve problem
     private void autoSolve()
     {
-    	
-    	/*
-    	//Undo incorrect steps:
-    	while(moves.size() > 0 && !moves.get(moves.size()-1).correct)
-    	{
-    		Move m = moves.get(moves.size()-1);
-    		move(stacks.get(m.to), m.to, stacks.get(m.from), m.from);	//Undo incorrect moves
-    		moves.remove(moves.size()-1);		//Remove undone move from list
-    		
-    		//doesn't work:
-    		//try {TimeUnit.SECONDS.sleep(2);} catch(InterruptedException e) {System.out.println("Problem");}
-    	}
-    	
-    	//Do remaining correct steps:
-    	int i = moves.size();
-    	while(i < solution.size())
-    	{
-    		Move m = solution.get(i);
-    		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
-    		++i;
-    		
-    		//doesn't work:
-    		//try {TimeUnit.SECONDS.sleep(2);} catch(InterruptedException e) {System.out.println("Problem");}	
-    	}
-    	*/
-    	
-    	//undoSteps();		//only when using PauseTransition; doesn't work properly
     	
     	solveByStep();	//do one step of the solution; then wait 0.5 seconds using a Task (Thread.sleep() didn't work)
     	if(!moves.get(moves.size()-1).correct || moves.size() < solution.size())
@@ -223,31 +199,7 @@ public class TowersOfHanoi extends Application {
     		});
     		new Thread(sleeper).start();
     	}
-    	
-    	
     }
-    
-    /*
-    private void undoSteps()	//only when using PauseTransition; doesn't work properly
-    {
-    	if(moves.size() > 0 && !moves.get(moves.size()-1).correct)
-		{
-	    	Move m = moves.get(moves.size()-1);
-			move(stacks.get(m.to), m.to, stacks.get(m.from), m.from);	//Undo incorrect moves
-			moves.remove(moves.size()-1);		//Remove undone move from list
-			
-		}
-    	//solCount = moves.size();
-		finish();
-    }
-    
-    private void finish()	//only when using PauseTransition; doesn't work properly
-    {
-    	Move m = solution.get(solCount);
-		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
-		++solCount;
-    }
-    */
     
     //Used for solveByStep Button and as base method for complete solution
     private void solveByStep()
@@ -256,18 +208,31 @@ public class TowersOfHanoi extends Application {
     	if(moves.size() > 0 && !moves.get(moves.size()-1).correct)
     	{
     		Move m = moves.get(moves.size()-1);
+    		//Debug:
+    		//System.out.println("Undo: Move disc from " + m.to + " to " + m.from + ".");
+    		System.out.println("List of Moves that were done:");
+    		for(Move move : moves)
+    		{
+    			System.out.println(move.from + " " + move.to + " " + move.correct);
+    		}
+    		System.out.println("End of List");
     		move(stacks.get(m.to), m.to, stacks.get(m.from), m.from);	//Undo incorrect moves
-    		moves.remove(moves.size()-1);		//Remove undone move from list
+    		//moves.remove(moves.size()-1);		//Remove undone move from list
     		
     	}
     	
-    	//Do remaining correct step:
-    	int i = moves.size();
-    	if(i < solution.size())
+    	else
     	{
-    		Move m = solution.get(i);
-    		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
-    		
+	    	//Do remaining correct step:
+	    	int i = moves.size();
+	    	if(i < solution.size())
+	    	{
+	    		Move m = solution.get(i);
+	    		//Debug:
+	    		System.out.println("Complete: Move Disc from " + m.from + " to " + m.to + ".");
+	    		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
+	    		
+	    	}
     	}
     }
     
@@ -307,7 +272,13 @@ public class TowersOfHanoi extends Application {
     					moves.add(new Move(fromNumber, toNumber, false));
     				}
     			}
+    			else	//If previous move was already false
+    			{
+    				moves.add(new Move(fromNumber, toNumber, false));	//Step always has to be undone
+    			}
     			
+    			System.out.println();
+    			System.out.println("Move Disc from " + fromNumber + " to " + toNumber + ".");
     			update(from, fromNumber, to, toNumber);
     		}
     		else System.out.println("Did nothing cause Disc to large");
@@ -318,7 +289,8 @@ public class TowersOfHanoi extends Application {
     //Are the two moves the same
     private boolean isSame(Move m1, Move m2)
     {
-    	return (m1.from == m2.from && m2.to == m2.to);
+    	System.out.println("Compare: " + m1.from + " " + m1.to + " with " + m2.from + " " + m2.to);
+    	return (m1.from == m2.from && m1.to == m2.to);
     }
     //Are the two moves opposites from each other
     private boolean isOpposite(Move m1, Move m2)
