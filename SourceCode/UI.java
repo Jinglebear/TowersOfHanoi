@@ -1,7 +1,9 @@
 import java.util.ArrayList;
 import java.util.List;
 
+import javafx.animation.*;
 import javafx.*;
+import javafx.event.*;
 import javafx.application.*;
 import javafx.scene.*;
 import javafx.scene.image.*;
@@ -10,18 +12,22 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.*;
 import javafx.scene.control.*;
 import javafx.scene.shape.*;
+import javafx.util.Duration;
 
-public class UI extends Application {
+public class TowersOfHanoi extends Application {
     public static void main(String[] args) {
         launch();
     }
-
+    
+    //Graphical Elements:
     Rectangle rbase = new Rectangle(400, 100, Color.SADDLEBROWN);
     Rectangle rbarA = new Rectangle(10, 100, Color.BROWN);
     Rectangle rbarB = new Rectangle(10, 100, Color.BROWN);
     Rectangle rbarC = new Rectangle(10, 100, Color.BROWN);
-    Button btnSolve = new Button("reset and solve");
+    ArrayList<Rectangle> bars = new ArrayList<Rectangle>();
+    Button btnSolve = new Button("solve");
     Button btnGenerate = new Button("generate Blocks");
+    Button btnTarget = new Button("Target:2");
     Button btnFirsttoSecond = new Button("1 --> 2");
     Button btnFirsttoThird = new Button("1 --> 3");
     Button btnSecondtoFirst = new Button("2 --> 1");
@@ -30,25 +36,45 @@ public class UI extends Application {
     Button btnThirdtoSecond = new Button("3 --> 2");
     TextField tf = new TextField();
     List<Rectangle> rectangles;
+    
+    //Logical Elements:
+    ArrayList<Integer> stack1 = new ArrayList<>();
+    ArrayList<Integer> stack2 = new ArrayList<>();
+    ArrayList<Integer> stack3 = new ArrayList<>();
+    ArrayList<ArrayList<Integer>> stacks = new ArrayList<ArrayList<Integer>>();
+    
+    
     @Override
     public void start(Stage s) throws Exception {
-        
+    	target = 1;
+    	solCount = 0;				//only when using PauseTransition
+    	moves = new ArrayList<Move>();
+    	solution = new ArrayList<Move>();
+    	bars.add(rbarA);
+        bars.add(rbarB);
+        bars.add(rbarC);
+        stacks.add(stack1);
+        stacks.add(stack2);
+        stacks.add(stack3);
         makeGUI(s);
+        
     }
-    private void generateRectangles(){
+    private void generateRectangles(Stage s){
         int n= Integer.parseInt(tf.getText());
         rectangles = new ArrayList<>();
-        double startWidth = 100;
+        double deltaWidth = 0;
+        double startWidth = 500;
         double startHeight= 50;
         double startXRect=146;
         double startYRect=640;
         for(int i=0;i<n;i++){
             Rectangle r = new Rectangle(startXRect, startYRect, startWidth, startHeight);
-            double tmpWidth= startWidth;
-            startWidth*=0.85;
-            startHeight*=0.85;
+            r.setFill(rndmColor());
+            r.widthProperty().bind(s.widthProperty().divide(4).subtract(deltaWidth));
+            deltaWidth += 25;
             startYRect -=startHeight;
-            startXRect += (tmpWidth-startWidth)/2;
+            r.xProperty().bind(rbarA.xProperty().subtract(r.widthProperty().divide(2).subtract(0.5*rbarA.getWidth())));
+            r.yProperty().bind(rbase.yProperty().subtract((rectangles.size())*r.getHeight()+r.getHeight()));
             rectangles.add(r);             
         }
         
@@ -57,6 +83,25 @@ public class UI extends Application {
             p.getChildren().add(r);
 
         }
+        
+        //Update Stack-Data (adding all Rectangles to first Stack:
+        for(int i = 0; i < rectangles.size(); ++i)
+        {
+        	stack1.add(i);
+        }
+        
+        //Prepare solution based on current (final) target-Stack:
+        if(target == 1)
+        	solve(rectangles.size(), 0, 1, 2, solution);
+        else if(target == 2)
+        	solve(rectangles.size(), 0, 2, 1, solution);
+        
+        for(int i = 0; i < solution.size(); ++i)
+        {
+        	System.out.println("Move Disc from " + solution.get(i).from + " to " + solution.get(i).to + ".");
+        }
+        
+        
     }
     private void makeGUI(Stage s){
         HBox vb = new HBox();
@@ -64,14 +109,30 @@ public class UI extends Application {
         tf.setMaxWidth(40);
         vb.getChildren().add(btnGenerate);
         vb.getChildren().add(btnSolve);
+        vb.getChildren().add(btnTarget);
         vb.getChildren().add(btnFirsttoSecond);        
         vb.getChildren().add(btnFirsttoThird);
         vb.getChildren().add(btnSecondtoFirst);
         vb.getChildren().add(btnSecondtoThird);
         vb.getChildren().add(btnThirdtoFirst);
         vb.getChildren().add(btnThirdtoSecond);
-        btnGenerate.setOnAction(e->generateRectangles());
-        btnSolve.setOnAction(e->reset());
+        //Logic:
+        btnFirsttoSecond.setOnAction(e -> move(stack1, 0, stack2, 1));
+        btnFirsttoThird.setOnAction(e -> move(stack1, 0, stack3, 2));
+        btnSecondtoFirst.setOnAction(e -> move(stack2, 1, stack1, 0));
+        btnSecondtoThird.setOnAction(e -> move(stack2, 1, stack3, 2));
+        btnThirdtoFirst.setOnAction(e -> move(stack3, 2, stack1, 0));
+        btnThirdtoSecond.setOnAction(e -> move(stack3, 2, stack2, 1));
+        
+        btnGenerate.setOnAction(e->generateRectangles(s));
+        btnSolve.setOnAction(e->autoSolve());
+        btnTarget.setOnAction(e -> {					//!only effective if used before start of game (Generation of rectangles)
+        	if(btnTarget.getText().equals("Target:2"))
+        	{
+        		btnTarget.setText("Target:3");
+        		target = 2;		//Stack with index 2 is target
+        	}
+        });
         rbase.widthProperty().bind(s.widthProperty());
         rbase.yProperty().bind(s.heightProperty().subtract(rbase.getHeight()));
 
@@ -100,9 +161,139 @@ public class UI extends Application {
     }
     private Pane p;
     private Scene sc;
-    private void reset(){
-        for(Rectangle r : rectangles){
-            r.setVisible(false);
+    
+    //Automatically rewind to last appropriate state and solve problem
+    private void autoSolve()
+    {
+    
+    	//Undo incorrect steps:
+    	while(moves.size() > 0 && !moves.get(moves.size()-1).correct)
+    	{
+    		Move m = moves.get(moves.size()-1);
+    		move(stacks.get(m.to), m.to, stacks.get(m.from), m.from);	//Undo incorrect moves
+    		moves.remove(moves.size()-1);		//Remove undone move from list
+    		
+    	}
+    	
+    	//Do remaining correct steps:
+    	int i = moves.size();
+    	while(i < solution.size())
+    	{
+    		Move m = solution.get(i);
+    		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
+    		++i;
+    		
+    	}
+    	
+    	
+    	//undoSteps();		//only when using PauseTransition; doesn't work properly
+    	
+    }
+    
+    private void undoSteps()	//only when using PauseTransition; doesn't work properly
+    {
+    	if(moves.size() > 0 && !moves.get(moves.size()-1).correct)
+		{
+	    	Move m = moves.get(moves.size()-1);
+			move(stacks.get(m.to), m.to, stacks.get(m.from), m.from);	//Undo incorrect moves
+			moves.remove(moves.size()-1);		//Remove undone move from list
+			
+			PauseTransition pt = new PauseTransition(Duration.millis(2000));
+			pt.setOnFinished(e -> undoSteps());
+			
+		}
+    	solCount = moves.size();
+		finish();
+    }
+    
+    private void finish()	//only when using PauseTransition; doesn't work properly
+    {
+    	Move m = solution.get(solCount);
+		move(stacks.get(m.from), m.from, stacks.get(m.to), m.to);	//Make one step in correct direction
+		++solCount;
+		
+		PauseTransition pt = new PauseTransition(Duration.millis(2000));
+		pt.setOnFinished(e -> finish());
+    }
+    
+    
+    private void move(ArrayList<Integer> from, int fromNumber, ArrayList<Integer> to, int toNumber)
+    {
+    	if(from.size() > 0)		//Do nothing if Stack is empty
+    	{
+    		if(to.size() == 0 || from.get(from.size()-1) > to.get(to.size()-1))	//Do nothing if disc in from is larger than disc in to
+    		{
+    			update(from, fromNumber, to, toNumber);
+    		}
+    		else System.out.println("Did nothing cause Disc to large");
+    	}
+    	else System.out.println("Did nothing cause Stack was empty");
+    }
+    
+    private void update(ArrayList<Integer> from, int fromNumber, ArrayList<Integer> to, int toNumber)
+    {
+    	//Update Graphics by moving the Disc to the new Stack (to) and move Integer value from from to to
+		//Graphics:
+		Rectangle r = rectangles.get(from.get(from.size()-1));
+		r.xProperty().bind(bars.get(toNumber).xProperty().subtract(r.widthProperty().divide(2).subtract(0.5*rbarA.getWidth())));
+		r.yProperty().bind(rbase.yProperty().subtract((to.size()+1)*r.getHeight()));
+		
+		//Update Stack-Data:
+		to.add(from.remove(from.size()-1));		//Disc that was on top of from is now on top of to
+    }
+    
+    //Prepare the solution for comparison with user-made moves
+    private void solve(int n, int from, int to, int aux, ArrayList<Move> m)
+    {
+    	if(n == 1)
+    	{
+    		m.add(new Move(from, to, true));
+    	}
+    	else
+    	{
+    		solve(n-1, from, aux, to, m);
+    		m.add(new Move(from, to, true));
+    		solve(n-1, aux, to, from, m);
+    	}
+    	
+    }
+    
+    //class to save moves made by player and moves which are part of the solution
+    private class Move
+    {
+    	Move(int from, int to, boolean correct)
+    	{
+    		this.from = from; 
+    		this.to = to;
+    		this.correct = correct;
+    	}
+    	int from;
+    	int to;
+    	boolean correct;
+    }
+    
+    ArrayList<Move> moves;
+    ArrayList<Move> solution;
+    int target;
+    int solCount;		//only when using PauseTransition
+
+    // random color generating method
+    private Color rndmColor(){
+        int i = (int) (Math.random()*10+1);
+        Color c=null;
+        switch(i){
+            case 1: c=Color.BURLYWOOD;break;
+            case 2: c=Color.BLUE;break;
+            case 3: c=Color.BROWN;break;
+            case 4: c=Color.AZURE;break;
+            case 5: c=Color.DARKGREEN; break;
+            case 6: c=Color.DARKGREY; break;
+            case 7: c=Color.BLANCHEDALMOND; break;
+            case 8: c=Color.DARKMAGENTA;break;
+            case 9: c=Color.DARKGOLDENROD;break;
+            case 10: c=Color.CORNSILK;break;
+            default : c=Color.RED;break;
         }
+        return c;
     }
 }
